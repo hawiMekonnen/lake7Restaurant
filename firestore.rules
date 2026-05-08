@@ -1,0 +1,115 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helpers ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isEmailVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    // In this app, any verified staff member (or the specific admin) can manage the restaurant.
+    // For simplicity in this demo, we'll check the email directly for the primary owner.
+    function isStaff() {
+      return isEmailVerified() && (
+        request.auth.token.email == 'hawimekonnen27@gmail.com' ||
+        exists(/databases/$(database)/documents/staff/$(request.auth.uid))
+      );
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // --- Entity Validations ---
+
+    function isValidMenuItem(data) {
+      return data.keys().hasAll(['name', 'price', 'category', 'availability']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+             data.price is number && data.price >= 0 &&
+             data.category in ['Main Course', 'Drinks', 'Desserts', 'Appetizers'] &&
+             data.availability in ['available', 'out_of_stock'];
+    }
+
+    function isValidOrder(data) {
+      return data.keys().hasAll(['customerName', 'items', 'total', 'status', 'createdAt']) &&
+             data.customerName is string && data.customerName.size() > 0 &&
+             data.items is list && data.items.size() > 0 &&
+             data.total is number && data.total >= 0 &&
+             data.status in ['received', 'prepared', 'out_for_delivery', 'delivered'] &&
+             data.createdAt == request.time;
+    }
+
+    function isValidInventoryItem(data) {
+      return data.keys().hasAll(['name', 'stockLevel', 'unit']) &&
+             data.name is string && data.stockLevel is number && data.unit is string;
+    }
+
+    function isValidDriver(data) {
+      return data.keys().hasAll(['name', 'status']) &&
+             data.name is string && data.status in ['online', 'offline', 'busy'];
+    }
+
+    function isValidFeedback(data) {
+      return data.keys().hasAll(['orderId', 'rating']) &&
+             data.orderId is string && data.rating is number && data.rating >= 1 && data.rating <= 5;
+    }
+
+    // --- Collections ---
+
+    match /menuItems/{itemId} {
+      allow read: if true; // Public can see menu
+      allow create, update: if isStaff() && isValidMenuItem(incoming());
+      allow delete: if isStaff();
+    }
+
+    match /orders/{orderId} {
+      // Staff can read all orders. Users can create, but in a real app, only read their own.
+      // For this "Restaurant Manager" app, everything is viewed by staff.
+      allow read: if isStaff();
+      allow create: if isValidOrder(incoming()); // Anyone (customer) can place an order
+      
+      allow update: if isStaff() && isValidOrder(incoming()) && (
+        // Action: Update Status
+        (incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt', 'driverId']) &&
+         incoming().updatedAt == request.time) ||
+        // Action: General Edit (if needed by admin)
+        (request.auth.token.email == 'hawimekonnen27@gmail.com')
+      );
+    }
+
+    match /inventory/{itemId} {
+      allow read, write: if isStaff() && isValidInventoryItem(incoming());
+    }
+
+    match /drivers/{driverId} {
+      allow read: if isStaff();
+      allow write: if isStaff() && isValidDriver(incoming());
+    }
+
+    match /feedback/{feedbackId} {
+      allow read: if isStaff();
+      allow create: if isValidFeedback(incoming()) && incoming().createdAt == request.time;
+    }
+    
+    match /staff/{staffId} {
+      allow read: if isSignedIn();
+      allow write: if request.auth.token.email == 'hawimekonnen27@gmail.com';
+    }
+  }
+}

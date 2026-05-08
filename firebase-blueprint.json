@@ -1,0 +1,76 @@
+{
+  "entities": {
+    "MenuItem": {
+      "title": "Menu Item",
+      "description": "An item available for order from the restaurant.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "price": { "type": "number" },
+        "category": { "type": "string", "enum": ["Main Course", "Drinks", "Desserts", "Appetizers"] },
+        "availability": { "type": "string", "enum": ["available", "out_of_stock"] },
+        "imageUrl": { "type": "string" },
+        "stockLevel": { "type": "number" }
+      },
+      "required": ["name", "price", "category", "availability"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "A customer order.",
+      "type": "object",
+      "properties": {
+        "customerName": { "type": "string" },
+        "customerPhone": { "type": "string" },
+        "items": { "type": "array" },
+        "total": { "type": "number" },
+        "status": { "type": "string", "enum": ["received", "prepared", "out_for_delivery", "delivered"] },
+        "driverId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["customerName", "items", "total", "status", "createdAt"]
+    },
+    "InventoryItem": {
+      "title": "Inventory Item",
+      "description": "Raw ingredients or stock levels.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "stockLevel": { "type": "number" },
+        "unit": { "type": "string" }
+      },
+      "required": ["name", "stockLevel", "unit"]
+    },
+    "Driver": {
+      "title": "Driver",
+      "description": "Delivery driver information.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "status": { "type": "string", "enum": ["online", "offline", "busy"] }
+      },
+      "required": ["name", "status"]
+    },
+    "Feedback": {
+      "title": "Feedback",
+      "description": "Customer feedback on orders.",
+      "type": "object",
+      "properties": {
+        "orderId": { "type": "string" },
+        "rating": { "type": "number" },
+        "comment": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["orderId", "rating"]
+    }
+  },
+  "firestore": {
+    "menuItems": { "schema": "MenuItem", "description": "Collection of menu items." },
+    "orders": { "schema": "Order", "description": "Collection of customer orders." },
+    "inventory": { "schema": "InventoryItem", "description": "Collection of inventory items." },
+    "drivers": { "schema": "Driver", "description": "Collection of delivery drivers." },
+    "feedback": { "schema": "Feedback", "description": "Collection of customer feedback." }
+  }
+}
