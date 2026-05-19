@@ -82,11 +82,8 @@ export default function App() {
     <div className="min-h-screen bg-slate-50 flex">
       {/* Sidebar */}
       <aside className="w-[240px] bg-sidebar border-r border-border hidden md:flex flex-col py-6">
-        <div className="px-6 mb-8 flex items-center gap-2">
-          <div className="text-primary">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
-          </div>
-          <span className="font-extrabold text-2xl text-primary tracking-tight">lake7</span>
+        <div className="px-6 mb-8 flex items-center">
+          <span className="font-extrabold text-3xl text-primary tracking-tight">lake7</span>
         </div>
         
         <nav className="flex-1 space-y-0.5">

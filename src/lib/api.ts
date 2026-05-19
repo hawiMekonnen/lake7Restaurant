@@ -33,7 +33,7 @@ export const orderService = {
 
 export const authService = {
   login: (email: string, password: string) => api.post('/auth/login', { email, password }),
-  register: (email: string, password: string, fullName: string) => api.post('/auth/register', { email, password, fullName }),
+  register: (email: string, password: string, fullName: string, phoneNumber: string) => api.post('/auth/register', { email, password, fullName, phoneNumber }),
 };
 
 export const restaurantService = {
