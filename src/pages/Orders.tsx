@@ -7,12 +7,32 @@ import {
   Truck, 
   Check,
   Search,
-  Filter
+  Filter,
+  MapPin,
+  Bike
 } from 'lucide-react';
 import { orderService } from '../lib/api';
 import { Order, OrderStatus } from '../types';
 import { formatCurrency, cn } from '../lib/utils';
 import { format } from 'date-fns';
+
+const getNextStatus = (status: OrderStatus): OrderStatus | null => {
+  switch (status) {
+    case OrderStatus.PENDING:
+    case OrderStatus.CONFIRMED:
+      return OrderStatus.RECEIVED;
+    case OrderStatus.RECEIVED:
+      return OrderStatus.PREPARED;
+    case OrderStatus.PREPARED:
+      return OrderStatus.OUT_FOR_DELIVERY;
+    case OrderStatus.OUT_FOR_DELIVERY:
+      return OrderStatus.DELIVERED;
+    case OrderStatus.DELIVERED:
+      return OrderStatus.COMPLETED;
+    default:
+      return null;
+  }
+};
 
 export default function Orders() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -24,7 +44,36 @@ export default function Orders() {
     try {
       setLoading(true);
       const res = await orderService.getOrders();
-      setOrders(res.data);
+      
+      // Map API Response to match frontend expectations
+      const mappedOrders: Order[] = res.data.map((o: any) => {
+        let itemsList = [];
+        let note = '';
+        try {
+          if (o.delivery?.itemDescription) {
+            const parsed = JSON.parse(o.delivery.itemDescription);
+            itemsList = parsed.items || [];
+            note = parsed.note || '';
+          }
+        } catch (e) {
+          itemsList = [{ id: '1', name: o.delivery?.itemDescription || 'Food Item', price: o.totalAmount, quantity: 1 }];
+        }
+
+        return {
+          id: o.id,
+          customerName: o.delivery?.receiverName || o.user?.fullName || 'Customer',
+          customerPhone: o.delivery?.receiverPhone || o.user?.phoneNumber || '',
+          items: itemsList,
+          total: o.totalAmount,
+          status: o.status as OrderStatus,
+          driverId: o.delivery?.driverId || undefined,
+          dropoffAddress: o.delivery?.dropoffAddress || 'No Address Provided',
+          note: note,
+          createdAt: { seconds: new Date(o.createdAt).getTime() / 1000 }
+        };
+      });
+
+      setOrders(mappedOrders);
     } catch (err) {
       console.error('Failed to fetch orders:', err);
     } finally {
@@ -66,9 +115,9 @@ export default function Orders() {
     }
   };
 
-
-
-  const filteredOrders = filter === 'all' ? orders : orders.filter(o => o.status === filter);
+  const filteredOrders = filter === 'all' 
+    ? orders 
+    : orders.filter(o => o.status === filter);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500 pb-10">
@@ -107,33 +156,61 @@ export default function Orders() {
           </div>
         ) : (
           filteredOrders.map((order) => (
-            <div key={order.id} className="card group hover:border-primary transition-colors">
-              <div className="card-header bg-slate-50/30">
-                <div>
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <span className="font-bold text-primary text-sm uppercase tracking-tighter">#{order.id.slice(0, 6)}</span>
-                    <span className="px-1.5 py-0.5 bg-white border border-border text-text-muted rounded-[4px] text-[9px] font-extrabold uppercase tracking-widest shadow-sm">
-                      {order.createdAt?.seconds ? format(order.createdAt.seconds * 1000, 'MMM d, HH:mm') : 'Just now'}
-                    </span>
+            <div key={order.id} className="card group hover:border-primary transition-colors flex flex-col justify-between">
+              <div>
+                <div className="card-header bg-slate-50/30 flex justify-between items-start">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-bold text-primary text-sm uppercase tracking-tighter">#{order.id.slice(0, 6)}</span>
+                      <span className="px-1.5 py-0.5 bg-white border border-border text-text-muted rounded-[4px] text-[9px] font-extrabold uppercase tracking-widest shadow-sm">
+                        {order.createdAt?.seconds ? format(order.createdAt.seconds * 1000, 'MMM d, HH:mm') : 'Just now'}
+                      </span>
+                    </div>
+                    <h4 className="text-base font-extrabold text-text-main leading-tight">{order.customerName}</h4>
+                    <p className="text-xs text-text-muted">{order.customerPhone}</p>
                   </div>
-                  <h4 className="text-base font-extrabold text-text-main leading-tight">{order.customerName}</h4>
+                  <div className="text-right">
+                    <p className="text-xl font-black text-primary leading-tight">{formatCurrency(order.total)}</p>
+                    <p className="text-[10px] text-text-muted font-bold uppercase tracking-widest">{order.items.length} items</p>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-xl font-black text-primary leading-tight">{formatCurrency(order.total)}</p>
-                  <p className="text-[10px] text-text-muted font-bold uppercase tracking-widest">{order.items.length} items</p>
-                </div>
-              </div>
 
-              {/* Items List */}
-              <div className="px-6 py-4 bg-white space-y-2 max-h-40 overflow-y-auto scrollbar-thin">
-                {order.items.map((item, idx) => (
-                  <div key={idx} className="flex justify-between text-xs items-center p-2 rounded-lg border border-transparent hover:border-slate-100 hover:bg-slate-50 transition-all">
-                    <span className="text-text-main font-medium">
-                      <span className="font-extrabold text-primary mr-2">{item.quantity}x</span> {item.name}
-                    </span>
-                    <span className="text-text-muted font-bold">{formatCurrency(item.price * item.quantity)}</span>
+                {/* Cyclist Indicator Badge */}
+                <div className="px-6 py-2 bg-blue-50/50 border-b border-slate-100 flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-xs text-blue-700 font-bold">
+                    <Bike className="w-4 h-4" />
+                    <span>Delivered by Cyclist</span>
                   </div>
-                ))}
+                  <span className="text-[10px] bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full font-extrabold uppercase tracking-wider">
+                    Bicycle Delivery
+                  </span>
+                </div>
+
+                {/* Delivery Destination */}
+                <div className="px-6 py-3 border-b border-slate-100 flex items-start gap-2">
+                  <MapPin className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-[10px] text-text-muted font-extrabold uppercase tracking-widest">Destination</p>
+                    <p className="text-xs text-text-main font-semibold leading-normal">{(order as any).dropoffAddress}</p>
+                  </div>
+                </div>
+
+                {/* Items List */}
+                <div className="px-6 py-4 bg-white space-y-2 max-h-40 overflow-y-auto scrollbar-thin">
+                  {order.items.map((item, idx) => (
+                    <div key={idx} className="flex justify-between text-xs items-center p-2 rounded-lg border border-transparent hover:border-slate-100 hover:bg-slate-50 transition-all">
+                      <span className="text-text-main font-medium">
+                        <span className="font-extrabold text-primary mr-2">{item.quantity}x</span> {item.name}
+                      </span>
+                      <span className="text-text-muted font-bold">{formatCurrency(item.price * item.quantity)}</span>
+                    </div>
+                  ))}
+                  {(order as any).note ? (
+                    <p className="text-[11px] bg-amber-50 text-amber-800 p-2 rounded-lg border border-amber-100 italic">
+                      Note: {(order as any).note}
+                    </p>
+                  ) : null}
+                </div>
               </div>
 
               {/* Progress Tracker (Refined Horizontal) */}
@@ -148,9 +225,23 @@ export default function Orders() {
                     { status: OrderStatus.DELIVERED, label: 'Ready', icon: CheckCircle2 },
                   ].map((step, idx, array) => {
                     const stepIdx = array.findIndex(s => s.status === order.status);
-                    const isCompleted = array.indexOf(step) < stepIdx || order.status === OrderStatus.DELIVERED;
+                    
+                    const statusesOrdered = [
+                      OrderStatus.PENDING,
+                      OrderStatus.CONFIRMED,
+                      OrderStatus.RECEIVED,
+                      OrderStatus.PREPARED,
+                      OrderStatus.OUT_FOR_DELIVERY,
+                      OrderStatus.DELIVERED,
+                      OrderStatus.COMPLETED
+                    ];
+                    
+                    const orderStatusIndex = statusesOrdered.indexOf(order.status);
+                    const stepStatusIndex = statusesOrdered.indexOf(step.status);
+                    
+                    const isCompleted = orderStatusIndex > stepStatusIndex || order.status === OrderStatus.COMPLETED;
                     const isCurrent = step.status === order.status;
-                    const isNext = array.indexOf(step) === stepIdx + 1 && order.status !== OrderStatus.DELIVERED;
+                    const isNext = getNextStatus(order.status) === step.status;
 
                     return (
                       <div key={step.status} className="relative z-10 flex flex-col items-center gap-3">
@@ -181,14 +272,14 @@ export default function Orders() {
                 {/* Driver Assignment */}
                 {order.status === OrderStatus.PREPARED && (
                   <div className="mb-4 space-y-2">
-                    <p className="text-[10px] text-text-muted font-bold uppercase tracking-widest">Assign Driver</p>
+                    <p className="text-[10px] text-text-muted font-bold uppercase tracking-widest">Assign Cyclist (Driver)</p>
                     <select 
                       onChange={(e) => assignDriver(order.id, e.target.value)}
                       className="w-full p-2 bg-white border border-border rounded-lg text-xs outline-none focus:ring-2 focus:ring-primary/20"
                       defaultValue=""
                     >
-                      <option value="" disabled>Select available driver...</option>
-                      {drivers.map(d => (
+                      <option value="" disabled>Select available cyclist...</option>
+                      {drivers.filter(d => d.vehicleType === 'Delivery' || d.vehicleType === 'Bike' || !d.vehicleType).map(d => (
                         <option key={d.id} value={d.id}>{d.name} ({d.vehicleType || 'Bike'})</option>
                       ))}
                     </select>
@@ -197,17 +288,16 @@ export default function Orders() {
 
                 {/* Action Button */}
                 <div>
-                  {order.status !== OrderStatus.DELIVERED ? (
+                  {order.status !== OrderStatus.COMPLETED && order.status !== OrderStatus.DELIVERED ? (
                     <button 
                       onClick={() => {
-                        const statuses = Object.values(OrderStatus);
-                        const nextIdx = statuses.indexOf(order.status) + 1;
-                        if (nextIdx < statuses.length) updateStatus(order.id, statuses[nextIdx]);
+                        const next = getNextStatus(order.status);
+                        if (next) updateStatus(order.id, next);
                       }}
                       className="w-full bg-primary hover:bg-primary-hover text-white py-2.5 rounded-[10px] text-xs font-extrabold uppercase tracking-widest transition-all shadow-sm flex items-center justify-center gap-2 group"
                     >
                       <Check className="w-4 h-4 group-hover:scale-125 transition-transform" />
-                      Next Step: {Object.values(OrderStatus)[Object.values(OrderStatus).indexOf(order.status) + 1]?.replace('_', ' ')}
+                      Next Step: {getNextStatus(order.status)?.replace('_', ' ')}
                     </button>
                   ) : (
                     <div className="w-full bg-emerald-50 text-emerald-600 py-2.5 rounded-[10px] text-xs font-extrabold uppercase tracking-widest border border-emerald-100 flex items-center justify-center gap-2 shadow-sm">
