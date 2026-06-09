@@ -3,30 +3,26 @@ import {
   LayoutDashboard, 
   UtensilsCrossed, 
   ClipboardList, 
-  Truck, 
   BarChart3, 
   MessageSquare, 
-  Box,
   ChevronRight,
   LogOut,
-   Bell,
-   Settings
+  Bell,
+  Settings
 } from 'lucide-react';
 import Login from './components/Login';
 
 import { cn } from './lib/utils';
 
-// Pages - placeholder imports
+// Pages
 import Dashboard from './pages/Dashboard';
 import Orders from './pages/Orders';
 import MenuManagement from './pages/MenuManagement';
-import Inventory from './pages/Inventory';
-import DeliveryCoordination from './pages/DeliveryCoordination';
 import Analytics from './pages/Analytics';
 import Feedback from './pages/Feedback';
 import RestaurantProfile from './pages/RestaurantProfile';
 
-type Page = 'dashboard' | 'orders' | 'menu' | 'inventory' | 'delivery' | 'analytics' | 'feedback' | 'profile';
+type Page = 'dashboard' | 'orders' | 'menu' | 'analytics' | 'feedback' | 'profile';
 
 export default function App() {
   const [user, setUser] = useState<{ email: string, displayName: string } | null>(null);
@@ -71,8 +67,6 @@ export default function App() {
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'orders', label: 'Orders', icon: ClipboardList },
     { id: 'menu', label: 'Menu', icon: UtensilsCrossed },
-    { id: 'inventory', label: 'Inventory', icon: Box },
-    { id: 'delivery', label: 'Delivery', icon: Truck },
     { id: 'analytics', label: 'Analytics', icon: BarChart3 },
     { id: 'feedback', label: 'Feedback', icon: MessageSquare },
     { id: 'profile', label: 'Profile', icon: Settings },
@@ -148,8 +142,6 @@ export default function App() {
             {activePage === 'dashboard' && <Dashboard />}
             {activePage === 'orders' && <Orders />}
             {activePage === 'menu' && <MenuManagement />}
-            {activePage === 'inventory' && <Inventory />}
-            {activePage === 'delivery' && <DeliveryCoordination />}
             {activePage === 'analytics' && <Analytics />}
             {activePage === 'feedback' && <Feedback />}
             {activePage === 'profile' && <RestaurantProfile />}

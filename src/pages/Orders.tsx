@@ -39,11 +39,30 @@ export default function Orders() {
   const [drivers, setDrivers] = useState<any[]>([]);
   const [filter, setFilter] = useState<OrderStatus | 'all'>('all');
   const [loading, setLoading] = useState(true);
+  const [restaurantId, setRestaurantId] = useState<string | null>(null);
+
+  // Resolve restaurant ID from profile on mount
+  useEffect(() => {
+    const loadRestaurantId = async () => {
+      const userStr = localStorage.getItem('user');
+      if (userStr) {
+        try {
+          const user = JSON.parse(userStr);
+          const { restaurantService } = await import('../lib/api');
+          const res = await restaurantService.getProfile(user.email);
+          setRestaurantId(res.data.id);
+        } catch {
+          // no-op — will fetch all if no restaurant yet
+        }
+      }
+    };
+    loadRestaurantId();
+  }, []);
 
   const fetchOrders = async () => {
     try {
       setLoading(true);
-      const res = await orderService.getOrders();
+      const res = await orderService.getOrders(restaurantId ?? undefined);
       
       // Map API Response to match frontend expectations
       const mappedOrders: Order[] = res.data.map((o: any) => {
@@ -67,6 +86,12 @@ export default function Orders() {
           total: o.totalAmount,
           status: o.status as OrderStatus,
           driverId: o.delivery?.driverId || undefined,
+          driver: o.delivery?.driver ? {
+            name: o.delivery.driver.name,
+            phoneNumber: o.delivery.driver.phoneNumber,
+            vehicleInfo: o.delivery.driver.vehicleInfo,
+            licensePlate: o.delivery.driver.licensePlate,
+          } : undefined,
           dropoffAddress: o.delivery?.dropoffAddress || 'No Address Provided',
           note: note,
           createdAt: { seconds: new Date(o.createdAt).getTime() / 1000 }
@@ -93,7 +118,7 @@ export default function Orders() {
   useEffect(() => {
     fetchOrders();
     fetchDrivers();
-  }, []);
+  }, [restaurantId]);
 
   const updateStatus = async (orderId: string, nextStatus: OrderStatus) => {
     try {
@@ -179,10 +204,12 @@ export default function Orders() {
                 <div className="px-6 py-2 bg-blue-50/50 border-b border-slate-100 flex items-center justify-between">
                   <div className="flex items-center gap-1.5 text-xs text-blue-700 font-bold">
                     <Bike className="w-4 h-4" />
-                    <span>Delivered by Cyclist</span>
+                    <span>
+                      {order.driver ? `Assigned Cyclist: ${order.driver.name} (${order.driver.phoneNumber})` : 'Delivered by Cyclist'}
+                    </span>
                   </div>
                   <span className="text-[10px] bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full font-extrabold uppercase tracking-wider">
-                    Bicycle Delivery
+                    {order.driver ? 'Cyclist Active' : 'Bicycle Delivery'}
                   </span>
                 </div>
 
@@ -288,17 +315,32 @@ export default function Orders() {
 
                 {/* Action Button */}
                 <div>
-                  {order.status !== OrderStatus.COMPLETED && order.status !== OrderStatus.DELIVERED ? (
+                  {order.status === OrderStatus.PENDING || order.status === OrderStatus.CONFIRMED ? (
                     <button 
-                      onClick={() => {
-                        const next = getNextStatus(order.status);
-                        if (next) updateStatus(order.id, next);
-                      }}
-                      className="w-full bg-primary hover:bg-primary-hover text-white py-2.5 rounded-[10px] text-xs font-extrabold uppercase tracking-widest transition-all shadow-sm flex items-center justify-center gap-2 group"
+                      onClick={() => updateStatus(order.id, OrderStatus.RECEIVED)}
+                      className="w-full bg-primary hover:bg-primary-hover py-2.5 rounded-[10px] text-xs font-bold uppercase tracking-widest transition-all shadow-sm flex items-center justify-center gap-2 group text-white"
                     >
                       <Check className="w-4 h-4 group-hover:scale-125 transition-transform" />
-                      Next Step: {getNextStatus(order.status)?.replace('_', ' ')}
+                      Next Step: Receive Order
                     </button>
+                  ) : order.status === OrderStatus.RECEIVED ? (
+                    <button 
+                      onClick={() => updateStatus(order.id, OrderStatus.PREPARED)}
+                      className="w-full bg-primary hover:bg-primary-hover py-2.5 rounded-[10px] text-xs font-bold uppercase tracking-widest transition-all shadow-sm flex items-center justify-center gap-2 group text-white"
+                    >
+                      <Check className="w-4 h-4 group-hover:scale-125 transition-transform" />
+                      Next Step: Food Prepared
+                    </button>
+                  ) : order.status === OrderStatus.PREPARED ? (
+                    <div className="w-full bg-amber-50 text-amber-600 py-2.5 rounded-[10px] text-xs font-extrabold uppercase tracking-widest border border-amber-100 flex items-center justify-center gap-2 shadow-sm">
+                       <Clock className="w-4 h-4" />
+                       Ready for Cyclist Pickup
+                    </div>
+                  ) : order.status === OrderStatus.OUT_FOR_DELIVERY ? (
+                    <div className="w-full bg-blue-50 text-blue-600 py-2.5 rounded-[10px] text-xs font-extrabold uppercase tracking-widest border border-blue-100 flex items-center justify-center gap-2 shadow-sm">
+                       <Truck className="w-4 h-4" />
+                       Out for Delivery
+                    </div>
                   ) : (
                     <div className="w-full bg-emerald-50 text-emerald-600 py-2.5 rounded-[10px] text-xs font-extrabold uppercase tracking-widest border border-emerald-100 flex items-center justify-center gap-2 shadow-sm">
                        <CheckCircle2 className="w-4 h-4" />

@@ -36,6 +36,12 @@ export interface Order {
   total: number;
   status: OrderStatus;
   driverId?: string;
+  driver?: {
+    name?: string;
+    phoneNumber?: string;
+    vehicleInfo?: string;
+    licensePlate?: string;
+  };
   createdAt: any; // Firestore Timestamp
   updatedAt?: any;
 }

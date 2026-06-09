@@ -1,6 +1,32 @@
 import axios from 'axios';
 
-const API_BASE = 'http://localhost:5260/api'; // Adjust for production
+function getApiOrigin(): string {
+  if (typeof window !== 'undefined') {
+    return `http://${window.location.hostname}:5260`;
+  }
+  return 'http://localhost:5260';
+}
+
+export const API_ORIGIN = getApiOrigin();
+const API_BASE = `${API_ORIGIN}/api`;
+
+/** Turn a relative /uploads/... path or localhost URL into a loadable image URL. */
+export function resolveImageUrl(url?: string | null): string {
+  if (!url) return '';
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    try {
+      const parsed = new URL(url);
+      if (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1') {
+        return `${API_ORIGIN}${parsed.pathname}`;
+      }
+    } catch {
+      /* use url as-is */
+    }
+    return url;
+  }
+  if (url.startsWith('/')) return `${API_ORIGIN}${url}`;
+  return url;
+}
 
 const api = axios.create({
   baseURL: API_BASE,
@@ -24,7 +50,13 @@ api.interceptors.request.use(
 export default api;
 
 export const orderService = {
-  getOrders: (status?: string) => api.get('/order' + (status ? `?status=${status}` : '')),
+  getOrders: (restaurantId?: string, status?: string) => {
+    const params = new URLSearchParams();
+    if (restaurantId) params.append('restaurantId', restaurantId);
+    if (status) params.append('status', status);
+    const query = params.toString();
+    return api.get('/order' + (query ? `?${query}` : ''));
+  },
   updateStatus: (id: string, status: string) => api.patch(`/order/${id}/status?status=${status}`),
   assignDriver: (id: string, driverId: string) => api.patch(`/order/${id}/assign/${driverId}`),
   getAvailableDrivers: () => api.get('/driver/available'),
@@ -45,4 +77,13 @@ export const restaurantService = {
   updateMenuItem: (id: string, data: any) => api.put(`/restaurant/menu/${id}`, data),
   deleteMenuItem: (id: string) => api.delete(`/restaurant/menu/${id}`),
   getAllRestaurants: () => api.get('/restaurant'),
+  uploadImage: async (file: File): Promise<string> => {
+    const form = new FormData();
+    form.append('file', file);
+    const token = localStorage.getItem('jwt');
+    const res = await axios.post(`${API_BASE}/restaurant/upload-image`, form, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    return res.data.url as string;
+  },
 };
